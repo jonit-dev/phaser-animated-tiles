@@ -22,7 +22,6 @@ module.exports = {
     },*/
     output: {
         pathinfo: true,
-        path: path.resolve(__dirname, 'dev'),
         path: `${__dirname}/dist/`,
         library: '[name]',
         libraryTarget: 'umd',

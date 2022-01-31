@@ -46,17 +46,32 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 	// define getter function for harmony exports
 /******/ 	__webpack_require__.d = function(exports, name, getter) {
 /******/ 		if(!__webpack_require__.o(exports, name)) {
-/******/ 			Object.defineProperty(exports, name, {
-/******/ 				configurable: false,
-/******/ 				enumerable: true,
-/******/ 				get: getter
-/******/ 			});
+/******/ 			Object.defineProperty(exports, name, { enumerable: true, get: getter });
 /******/ 		}
 /******/ 	};
 /******/
 /******/ 	// define __esModule on exports
 /******/ 	__webpack_require__.r = function(exports) {
+/******/ 		if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 			Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 		}
 /******/ 		Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 	};
+/******/
+/******/ 	// create a fake namespace object
+/******/ 	// mode & 1: value is a module id, require it
+/******/ 	// mode & 2: merge all properties of value into the ns
+/******/ 	// mode & 4: return value when already ns object
+/******/ 	// mode & 8|1: behave like require
+/******/ 	__webpack_require__.t = function(value, mode) {
+/******/ 		if(mode & 1) value = __webpack_require__(value);
+/******/ 		if(mode & 8) return value;
+/******/ 		if((mode & 4) && typeof value === 'object' && value && value.__esModule) return value;
+/******/ 		var ns = Object.create(null);
+/******/ 		__webpack_require__.r(ns);
+/******/ 		Object.defineProperty(ns, 'default', { enumerable: true, value: value });
+/******/ 		if(mode & 2 && typeof value != 'string') for(var key in value) __webpack_require__.d(ns, key, function(key) { return value[key]; }.bind(null, key));
+/******/ 		return ns;
 /******/ 	};
 /******/
 /******/ 	// getDefaultExport function for compatibility with non-harmony modules
@@ -362,7 +377,10 @@ var AnimatedTiles = function (_Phaser$Plugins$Scene) {
 
     }, {
         key: 'shutdown',
-        value: function shutdown() {}
+        value: function shutdown() {
+            // dercetech@github: this fixes a memory leak; a ref to all tiles in a scene would be retained in spite of switching scenes.
+            this.animatedTiles.length = 0;
+        }
 
         //  Called when a Scene is destroyed by the Scene Manager. There is no coming back from a destroyed Scene, so clear up all resources here.
 
@@ -405,15 +423,23 @@ var AnimatedTiles = function (_Phaser$Plugins$Scene) {
                         });
                         // time until jumping to next frame
                         animatedTileData.next = animatedTileData.frames[0].duration;
+                        // set correct currentFrame if animation starts with different tile than the one with animation flag
+                        animatedTileData.currentFrame = animatedTileData.frames.findIndex(function (f) {
+                            return f.tileid === index + tileset.firstgid;
+                        });
                         // Go through all layers for tiles
                         map.layers.forEach(function (layer) {
-                            if (layer.tilemapLayer.type === "StaticTilemapLayer") {
-                                // We just push an empty array if the layer is static (impossible to animate). 
-                                // If we just skip the layer, the layer order will be messed up
-                                // when updating animated tiles and things will look awful.
-                                animatedTileData.tiles.push([]);
-                                return;
+                            //In newer version of phaser there is only one type of layer, so checking for static is breaking the plugin
+                            if (layer.tilemapLayer && layer.tilemapLayer.type) {
+                                if (layer.tilemapLayer.type === "StaticTilemapLayer") {
+                                    // We just push an empty array if the layer is static (impossible to animate). 
+                                    // If we just skip the layer, the layer order will be messed up
+                                    // when updating animated tiles and things will look awful.
+                                    animatedTileData.tiles.push([]);
+                                    return;
+                                }
                             }
+
                             // tiles array for current layer
                             var tiles = [];
                             // loop through all rows with tiles...
@@ -421,7 +447,7 @@ var AnimatedTiles = function (_Phaser$Plugins$Scene) {
                                 // ...and loop through all tiles in that row
                                 tileRow.forEach(function (tile) {
                                     // Tiled start index for tiles with 1 but animation with 0. Thus that wierd "-1"                                                    
-                                    if (tile.index - tileset.firstgid === index) {
+                                    if (tile && tile.index - tileset.firstgid === index) {
                                         tiles.push(tile);
                                     }
                                 });
@@ -477,7 +503,8 @@ var AnimatedTiles = function (_Phaser$Plugins$Scene) {
                 mapAnimData.animatedTiles.forEach(function (tileAnimData) {
                     tileAnimData.tiles.forEach(function (tiles, layerIndex) {
                         var layer = mapAnimData.map.layers[layerIndex];
-                        if (layer.type === "StaticTilemapLayer") {
+                        //In newer version of phaser there is only one type of layer, so checking for static is breaking the plugin
+                        if (layer.type && layer.type === "StaticTilemapLayer") {
                             return;
                         }
                         for (var _x9 = chkX; _x9 < chkX + chkW; _x9++) {
